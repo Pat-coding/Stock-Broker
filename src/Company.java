@@ -12,6 +12,9 @@ public class Company {
         this.price = price;
     }
 
+    public Company() {
+    }
+
     public String getName() {
         return name;
     }

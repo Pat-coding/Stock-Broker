@@ -2,13 +2,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class StockExchange {
-    private HashMap<Company, Float> companies;
-    private ArrayList<Client> clients;
-
-    public enum orderType {
-        BUY,
-        SELL,
-    }
+    private final HashMap<Company, Float> companies;
+    private final ArrayList<Client> clients;
 
     public StockExchange(Company company, float shares) {
         this();
@@ -17,7 +12,9 @@ public class StockExchange {
 
     public StockExchange() {
         companies = new HashMap<>();
+        clients = new ArrayList<>();
     }
+
     public boolean registerCompany(Company company, float numberOfShares) {
         if (!getCompanies().containsKey(company)) {
             getCompanies().put(company, numberOfShares);
@@ -46,16 +43,32 @@ public class StockExchange {
             System.out.println("Client already exist!");
             return false;
         }
+
     }
 
-    public synchronized void processOrders(Company company, float shares, orderType typeOfOrder) {
+    public void processOrders(Company company, float shares, orderType typeOfOrder) {
         if (typeOfOrder.equals(orderType.BUY)) {
             company.setLiquidity(-shares);
-            getCompanies().replace(company, company.getAvailableShares());
-        } else if (typeOfOrder.equals(orderType.SELL)) {
+        } else {
             company.setLiquidity(shares);
-            getCompanies().replace(company, company.getAvailableShares());
         }
+        getCompanies().replace(company, company.getAvailableShares());
+    }
+
+    public synchronized void queueBuyLimit(Company company, float shares, float limit) throws InterruptedException {
+        while (!checkPriceLimit(company, limit, orderType.BUY_LOW)) {//share status
+            System.out.println("waiting...");
+            wait();
+        }
+        processOrders(company, shares, orderType.BUY);
+    }
+
+    public synchronized void queueSellLimit(Company company, float shares, float limit) throws InterruptedException {
+        while (!checkPriceLimit(company, limit, orderType.SELL_HIGH)) {//share status
+            System.out.println("waiting...");
+            wait();
+        }
+        processOrders(company, shares, orderType.SELL);
     }
 
     public boolean removeClient(Client client) {
@@ -81,8 +94,11 @@ public class StockExchange {
         return clientShareToPrice(company, sharesToBuy, clientBalance) > 0;
     }
 
-    public boolean checkPriceLimit(Company company, float limit) {
-        if(company.getPrice() == limit) {
+    public boolean checkPriceLimit(Company company, float limit, orderType typeOfOrder) {
+        if (company.getPrice() <= limit && typeOfOrder.equals(orderType.BUY_LOW)) {
+            notify();
+            return true;
+        } else if (company.getPrice() >= limit && typeOfOrder.equals(orderType.SELL_HIGH)){
             notify();
             return true;
         } else {
@@ -115,5 +131,12 @@ public class StockExchange {
         } else {
             System.out.println("Price can not be negative when changing price!");
         }
+    }
+
+    public enum orderType {
+        BUY,
+        SELL,
+        BUY_LOW,
+        SELL_HIGH
     }
 }

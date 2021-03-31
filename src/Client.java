@@ -8,9 +8,22 @@ public class Client implements Runnable{
 
     @Override
     public void run() {
-        for(int i = 0; i < 100; i++) {
-            buy((Company) stockExchange.getCompanies().keySet().toArray()[0], 1);
+
+
+        for(int i = 0; i < 10; i++) {
+            try {
+                buy((Company) stockExchange.getCompanies().keySet().toArray()[0], 1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            stockExchange.changePriceBy((Company) stockExchange.getCompanies().keySet().toArray()[0], -0.05f);
         }
+        try {
+            buyLow((Company) stockExchange.getCompanies().keySet().toArray()[0], 3, 2.1f);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println(getBalance());
     }
 
     public Client(HashMap<Company, Float> shares, float balance, String name) {
@@ -34,7 +47,7 @@ public class Client implements Runnable{
         this.shares = shares;
     }
 
-    public synchronized boolean buy(Company company, float numberOfShares) {
+    public boolean buy(Company company, float numberOfShares) throws InterruptedException {
         if(stockExchange.checkPrice(company, numberOfShares, getBalance())) {
             if(stockExchange.shareStatus(company, numberOfShares)) {
                 setBalance(stockExchange.clientShareToPrice(company, numberOfShares, getBalance()));
@@ -51,7 +64,7 @@ public class Client implements Runnable{
         }
     }
 
-    public synchronized boolean sell(Company company, float numberOfShares) {
+    public boolean sell(Company company, float numberOfShares) throws InterruptedException {
         if(numberOfShares > getStocks().get(company)) {
             setBalance(stockExchange.clientShareToPrice(company, numberOfShares, getBalance()));
             System.out.println(name + " has sold " + numberOfShares + " shares to " + company.getName()
@@ -65,20 +78,16 @@ public class Client implements Runnable{
     }
 
     //use wait and notify, price limit!
-    public synchronized boolean buyLow(Company company, float numberOfShares, float limit) throws InterruptedException {
-        while(!stockExchange.checkPriceLimit(company, limit)) {//share status
-            System.out.println(name + " has set buy limit: " + limit + "p for " + company.getName());
-            wait();
-        }
-        return buy(company, numberOfShares);
+    public boolean buyLow(Company company, float numberOfShares, float limit) throws InterruptedException {
+        System.out.println(name + " has set buy limit: " + limit + "p for " + company.getName());
+        stockExchange.queueBuyLimit(company, numberOfShares, limit);
+        return true;
     }
 
-    public synchronized boolean sellHigh(Company company, float numberOfShares, float limit) throws InterruptedException {
-        while (!stockExchange.checkPriceLimit(company, limit)) {
-            System.out.println(name + " has set sell limit: " + limit + "p for " + company.getName());
-            wait();
-        }
-        return sell(company, numberOfShares);
+    public boolean sellHigh(Company company, float numberOfShares, float limit) throws InterruptedException {
+        System.out.println(name + " has set sell limit: " + limit + "p for " + company.getName());
+        stockExchange.queueSellLimit(company, numberOfShares, limit);
+        return true;
     }
 
     public boolean deposit(float amount) {
